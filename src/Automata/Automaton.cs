@@ -2374,6 +2374,7 @@ namespace Microsoft.Automata
         {
             if (timeoutLimit > 0)
             {
+                //Console.Error.WriteLine("timeoutLimit {0} Now {1} Remaining {2}", timeoutLimit, Utilities.HighTimer.Now, timeoutLimit - Utilities.HighTimer.Now);
                 if (Utilities.HighTimer.Now > timeoutLimit)
                     throw new TimeoutException();
             }
@@ -2531,7 +2532,7 @@ namespace Microsoft.Automata
             return det;
         }
 
-
+        /* timeout: ms */
         public Automaton<T> Determinize(int timeout = 0)
         {
             IBooleanAlgebra<T> solver = algebra;
@@ -2542,7 +2543,8 @@ namespace Microsoft.Automata
             Automaton<T>[] disjuncts;
             if (TryDecompose(out disjuncts))  
             {
-                var disjuncts_det = Array.ConvertAll(disjuncts, d => d.Determinize().Minimize());
+                Console.Error.WriteLine("Decomposing worked");
+                var disjuncts_det = Array.ConvertAll(disjuncts, d => d.Determinize(timeout).Minimize());
                 var disjuncts_comp = Array.ConvertAll(disjuncts_det, d => d.Complement().Minimize());
                 var prod = Automaton<T>.MkProductOfDeterministicAutomata(disjuncts_comp);
                 var union = prod.Complement();
@@ -2960,7 +2962,7 @@ namespace Microsoft.Automata
         /// <summary>
         /// Minimization of SFAs.
         /// Can also be applied to nondeterministic SFAs.
-        /// WARNING: This function has surprising effects (e.g. dropping half of an OR'd NFA). Probably do not use.
+        /// JD: WARNING: This function has surprising effects (e.g. dropping half of an OR'd NFA). Probably do not use.
         /// </summary>
         public Automaton<T> Minimize()
         {
