@@ -307,7 +307,7 @@ namespace System.Text.RegularExpressions {
             return ScanRegex(removeLoops, out hasLoops);
         }
 
-        internal RegexNode ScanRegex(bool removeLoops, out bool hasLoops) {
+        internal RegexNode ScanRegex(bool reduceForBasisPaths, out bool hasLoops) {
             char ch = '@'; // nonspecial ch, means at beginning
             bool isQuantifier = false;
             hasLoops = false;
@@ -458,7 +458,7 @@ namespace System.Text.RegularExpressions {
                             hasLoops = true;
 
                             min = 0;
-                            if (removeLoops)
+                            if (reduceForBasisPaths)
                                 max = 1;
                             else
                                 max = Int32.MaxValue;
@@ -475,13 +475,19 @@ namespace System.Text.RegularExpressions {
                             hasLoops = true;
 
                             min = 1;
-                            if (removeLoops)
+                            if (reduceForBasisPaths)
                                 max = 1;
                             else
                                 max = Int32.MaxValue;
                             break;
 
                         case '{': {
+                                // reduceForBasisPaths: {m} and {m,n} are both reduced to {1}
+                                // This reduces the risk of combinatorial explosion when analyzing basis paths
+                                // in regexes like (a?){32} (2^32 bases).
+                                // However it also causes the reduced regex to be inconsistent,
+                                // e.g. reducing the lengths of the basis inputs.
+                                // Reducing to {m} would be cleaner.
                                 startpos = Textpos();
                                 max = min = ScanDecimal();
                                 if (startpos < Textpos()) { // True if we found a decimal
@@ -493,8 +499,11 @@ namespace System.Text.RegularExpressions {
                                             // {5,}
                                             _featureVec["LWB"]++;
                                             hasLoops = true;
-                                            if (removeLoops)
-                                                max = min;
+                                            if (reduceForBasisPaths)
+                                            {
+                                                min = 1;
+                                                max = 1;
+                                            }
                                             else
                                                 max = Int32.MaxValue;
                                         }
@@ -504,14 +513,22 @@ namespace System.Text.RegularExpressions {
                                             _featureVec["DBB"]++;
                                             max = ScanDecimal();
 
-                                            if (removeLoops)
-                                                max = min;
+                                            if (reduceForBasisPaths)
+                                            {
+                                                min = 1;
+                                                max = 1;
+                                            }
                                         }
                                     }
                                     else
                                     {
                                         // {5}
                                         _featureVec["SNG"]++;
+                                        if (reduceForBasisPaths)
+                                        {
+                                            min = 1;
+                                            max = 1;
+                                        }
                                     }
                                 }
 
