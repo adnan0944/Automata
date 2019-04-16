@@ -2960,6 +2960,7 @@ namespace Microsoft.Automata
         /// <summary>
         /// Minimization of SFAs.
         /// Can also be applied to nondeterministic SFAs.
+        /// WARNING: This function has surprising effects (e.g. dropping half of an OR'd NFA). Probably do not use.
         /// </summary>
         public Automaton<T> Minimize()
         {

@@ -3,32 +3,19 @@ using System.Collections.Generic;
 using System.Text;
 using System.Runtime.InteropServices;
 using System.Security;
+using System.Diagnostics;
 
 namespace Microsoft.Automata.Utilities
 {
     /// <summary>
-    /// High precision timer
+    /// High precision timer -- Modified to use Stopwatch (lowering the precision?) so it will run on Wine
     /// </summary>
     internal static class HighTimer
     {
-        [SuppressUnmanagedCodeSecurity]
-        sealed class Win32
-        {
-            [DllImport("Kernel32.dll"), SuppressUnmanagedCodeSecurity]
-            public static extern bool QueryPerformanceCounter(out long lpPerformanceCount);
-
-            [DllImport("Kernel32.dll"), SuppressUnmanagedCodeSecurity]
-            public static extern bool QueryPerformanceFrequency(out long lpFrequency);
-        }
-
         private readonly static long frequency;
         static HighTimer()
         {
-            if (!Win32.QueryPerformanceFrequency(out frequency))
-            {
-                // high-performance counter not supported
-                throw new Exception();
-            }
+            frequency = Stopwatch.Frequency;
         }
 
         /// <summary>
@@ -48,10 +35,7 @@ namespace Microsoft.Automata.Utilities
         {
             get
             {
-                long startTime;
-                if (!Win32.QueryPerformanceCounter(out startTime))
-                    throw new AutomataException("QueryPerformanceCounter failed");
-                return startTime;
+                return Stopwatch.GetTimestamp();
             }
         }
 

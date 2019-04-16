@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text.RegularExpressions;
 using Microsoft.Automata;
 
@@ -44,7 +45,7 @@ namespace Microsoft.Automata
         /// </summary>
         /// <param name="solver">solver for character constraints</param>
         /// <param name="categorizer">maps unicode categories to corresponding character conditions</param>
-        internal RegexToAutomatonConverter(ICharAlgebra<S> solver, IUnicodeCategoryTheory<S> categorizer = null)
+        public RegexToAutomatonConverter(ICharAlgebra<S> solver, IUnicodeCategoryTheory<S> categorizer = null)
         {
             this.solver = solver;
             this.categorizer = (categorizer == null ? new UnicodeCategoryTheory<S>(solver) : categorizer);
@@ -96,18 +97,49 @@ namespace Microsoft.Automata
         /// <param name="keepBoundaryStates">used for testing purposes, when true boundary states are not eliminated</param>
         public Automaton<S> Convert(string regex, RegexOptions options, bool keepBoundaryStates)
         {
+            bool hasLoops = false;
+            return Convert(regex, options, keepBoundaryStates, false, out hasLoops);
+        }
+
+        public Automaton<S> Convert(string regex, RegexOptions options, bool keepBoundaryStates, bool removeLoops, out bool hasLoops)
+        { 
             automBuilder.Reset();
             //filter out the RightToLeft option that turns around the parse tree
             //but has no semantical meaning regarding the regex
             var options1 = (options & ~RegexOptions.RightToLeft);
 
-            RegexTree tree = RegexParser.Parse(regex, options1);
+            RegexTree tree = RegexParser.Parse(regex, options1, removeLoops, out hasLoops);
             var aut = ConvertNode(tree._root);
             //delay accessing the condition
             Func<bool, S> getWordLetterCondition = (b => categorizer.WordLetterCondition);
             if (!keepBoundaryStates)
                 aut.EliminateWordBoundaries(getWordLetterCondition);
             return aut;
+        }
+
+        public RegexTree MakeTree(string regex, RegexOptions options)
+        {
+            //filter out the RightToLeft option that turns around the parse tree
+            //but has no semantical meaning regarding the regex
+            var options1 = (options & ~RegexOptions.RightToLeft);
+            RegexTree tree = RegexParser.Parse(regex, options1);
+            return tree;
+        }
+
+        public Dictionary<string, int> FeatureVector(string regex)
+        {
+            // Scan the regex
+            RegexParser p;
+                       
+            // Cribbed from RegexParser.Parse()
+            p = new RegexParser(CultureInfo.CurrentCulture);
+            p.SetPattern(regex);
+            p.CountCaptures();
+            p.Reset(RegexOptions.None);
+            p.ScanRegex();
+
+            // Return the feature vector created during the scan
+            return p.FeatureVec();
         }
 
         internal Tuple<string,Automaton<S>>[] ConvertCaptures(string regex, out bool isLoop)
