@@ -178,7 +178,7 @@ namespace AutomataCLI
                 autMeasures["nfa_orig_nStates"] = Automaton_nStates(aut);
                 autMeasures["nfa_orig_nEdges"] = Automaton_nEdges(aut);
                 autMeasures["nfa_orig_nEdgePairs"] = Automaton_nEdgePairs(aut);
-                autMeasures["nfa_orig_isLoopFree"] = Automaton_isLoopFree(aut);
+                //autMeasures["nfa_orig_isLoopFree"] = Automaton_isLoopFree(aut);
                 autMeasures["finiteLanguage"] = hasLoops ? 0 : 1;
                 //aut.ShowGraph("nfa_orig_pattern-" + pattern.GetHashCode());
 
@@ -187,21 +187,21 @@ namespace AutomataCLI
                 autMeasures["nfa_efree_nStates"] = Automaton_nStates(efree);
                 autMeasures["nfa_efree_nEdges"] = Automaton_nEdges(efree);
                 autMeasures["nfa_efree_nEdgePairs"] = Automaton_nEdgePairs(efree);
-                autMeasures["nfa_efree_isLoopFree"] = Automaton_isLoopFree(efree);
+                //autMeasures["nfa_efree_isLoopFree"] = Automaton_isLoopFree(efree);
 
                 // Minimal NFA measurements
                 Automaton<BDD> minaut = aut.Minimize();
                 autMeasures["nfa_min_nStates"] = Automaton_nStates(minaut);
                 autMeasures["nfa_min_nEdges"] = Automaton_nEdges(minaut);
                 autMeasures["nfa_min_nEdgePairs"] = Automaton_nEdgePairs(minaut);
-                autMeasures["nfa_min_isLoopFree"] = Automaton_isLoopFree(minaut);
+                //autMeasures["nfa_min_isLoopFree"] = Automaton_isLoopFree(minaut);
 
                 // DFA measurements
                 Automaton<BDD> detaut = aut.Determinize();
                 autMeasures["dfa_nStates"] = Automaton_nStates(detaut);
                 autMeasures["dfa_nEdges"] = Automaton_nEdges(detaut);
                 autMeasures["dfa_nEdgePairs"] = Automaton_nEdgePairs(detaut);
-                autMeasures["dfa_isLoopFree"] = Automaton_isLoopFree(detaut);
+                //autMeasures["dfa_isLoopFree"] = Automaton_isLoopFree(detaut);
 
                 Tuple<BDD[], int> shortestPath = detaut.FindShortestFinalPath(detaut.InitialState);
                 autMeasures["dfa_shortestMatchingInput"] = shortestPath.Item1.Length;
@@ -209,7 +209,7 @@ namespace AutomataCLI
                 // It worked!
                 autMeasures["valid"] = 1;
             }
-            catch (AutomataException e)
+            catch (Exception e)
             {
                 Console.Error.WriteLine("Error making automaton from /{0}/: {1}", pattern, e);
             }
@@ -240,7 +240,7 @@ namespace AutomataCLI
                 graph = Automaton_graph(aut);
                 //aut.ShowGraph("aut-" + pattern.GetHashCode());
             }
-            catch (AutomataException e)
+            catch (Exception e)
             {
                 Console.Error.WriteLine("Error making automaton from /{0}/: {1}", pattern, e);
             }
@@ -269,6 +269,12 @@ namespace AutomataCLI
             return edgePairs.Count();
         }
 
+        /* This is not the most useful metric.
+         * Regexes without ^ have a leading loop.
+         * Regexes with or without a $ have a trailing loop, either
+         *  to reject state ($) or accept state (no $).
+         * Use the "hasLoops" measure computed during ScanRegex instead.
+         */
         static int Automaton_isLoopFree(Automaton<BDD> aut)
         {
             return aut.IsLoopFree ? 1 : 0;
