@@ -37,7 +37,8 @@ namespace AutomataCLI
             pattern = @"a(?i-x:(\w))b"; // OPT CG
 
             //new RegexMetrics(@"(a|b|c|d)*[abcd]*|(gh+)+");
-            //new RegexMetrics(@"abc");
+            //new RegexMetrics(@"[&?]file=([^&]+)");
+            //while (true) { }
             //new RegexMetrics(@"^abc");
             //new RegexMetrics(@"abc$");
             //new RegexMetrics(@"^abc$");
@@ -54,8 +55,12 @@ namespace AutomataCLI
             // Read file
             System.IO.StreamReader file = new System.IO.StreamReader(queryFile);
             string line;
+            int i = 0;
             while ((line = file.ReadLine()) != null)
             {
+                Console.Error.WriteLine("Line {0}: {1}", i, line);
+                i++;
+
                 ProcessLine(line);
             }
         }
@@ -165,6 +170,8 @@ namespace AutomataCLI
             Dictionary<string, int> autMeasures = new Dictionary<string, int>();
             autMeasures["valid"] = 0;
 
+            int timeout_ms = 10 * 1000; // 10 seconds in ms
+
             try
             {
                 Console.Error.WriteLine("Automaton measurements");
@@ -173,6 +180,7 @@ namespace AutomataCLI
                 RegexToAutomatonConverter<BDD> conv = new RegexToAutomatonConverter<BDD>(solver);
 
                 // NFA measurements
+                Console.Error.WriteLine("NFA");
                 bool hasLoops = false;
                 Automaton<BDD> aut = conv.Convert(pattern, RegexOptions.None, false, false, out hasLoops);
                 autMeasures["nfa_orig_nStates"] = Automaton_nStates(aut);
@@ -183,6 +191,7 @@ namespace AutomataCLI
                 //aut.ShowGraph("nfa_orig_pattern-" + pattern.GetHashCode());
 
                 // e-free NFA measurements
+                Console.Error.WriteLine("e-free NFA");
                 Automaton<BDD> efree = aut.RemoveEpsilons();
                 autMeasures["nfa_efree_nStates"] = Automaton_nStates(efree);
                 autMeasures["nfa_efree_nEdges"] = Automaton_nEdges(efree);
@@ -190,21 +199,45 @@ namespace AutomataCLI
                 //autMeasures["nfa_efree_isLoopFree"] = Automaton_isLoopFree(efree);
 
                 // Minimal NFA measurements
-                Automaton<BDD> minaut = aut.Minimize();
-                autMeasures["nfa_min_nStates"] = Automaton_nStates(minaut);
-                autMeasures["nfa_min_nEdges"] = Automaton_nEdges(minaut);
-                autMeasures["nfa_min_nEdgePairs"] = Automaton_nEdgePairs(minaut);
-                //autMeasures["nfa_min_isLoopFree"] = Automaton_isLoopFree(minaut);
+                // These APIs seem untrustworthy. Odd behavior, require DFA, etc.
+                //Console.Error.WriteLine("Moore-minimized NFA");
+                //try
+                //{
+                //    Automaton<BDD> minaut = aut.MinimizeMoore(timeout_ms);
+                //    autMeasures["nfa_min_nStates"] = Automaton_nStates(minaut);
+                //    autMeasures["nfa_min_nEdges"] = Automaton_nEdges(minaut);
+                //    autMeasures["nfa_min_nEdgePairs"] = Automaton_nEdgePairs(minaut);
+                //    //autMeasures["nfa_min_isLoopFree"] = Automaton_isLoopFree(minaut);
+                //
+                //    autMeasures["nfa_min_timeout"] = 0;
+                //} catch (TimeoutException e)
+                //{
+                //    autMeasures["nfa_min_timeout"] = 1;
+                //}
 
                 // DFA measurements
-                Automaton<BDD> detaut = aut.Determinize();
-                autMeasures["dfa_nStates"] = Automaton_nStates(detaut);
-                autMeasures["dfa_nEdges"] = Automaton_nEdges(detaut);
-                autMeasures["dfa_nEdgePairs"] = Automaton_nEdgePairs(detaut);
-                //autMeasures["dfa_isLoopFree"] = Automaton_isLoopFree(detaut);
+                Console.Error.WriteLine("DFA");
+                try
+                {
+                    Console.Error.WriteLine("  Determinizing (timeout {0} ms)", timeout_ms);
+                    Automaton<BDD> dfa = aut.Determinize(timeout_ms);
+                    Console.Error.WriteLine("  Minimizing");
+                    Automaton<BDD> dfamin = dfa.MinimizeMoore(timeout_ms);
 
-                Tuple<BDD[], int> shortestPath = detaut.FindShortestFinalPath(detaut.InitialState);
-                autMeasures["dfa_shortestMatchingInput"] = shortestPath.Item1.Length;
+                    autMeasures["dfamin_nStates"] = Automaton_nStates(dfamin);
+                    autMeasures["dfamin_nEdges"] = Automaton_nEdges(dfamin);
+                    autMeasures["dfamin_nEdgePairs"] = Automaton_nEdgePairs(dfamin);
+                    //autMeasures["dfa_isLoopFree"] = Automaton_isLoopFree(mindetaut);
+
+                    Tuple<BDD[], int> shortestPath = dfamin.FindShortestFinalPath(dfamin.InitialState);
+                    autMeasures["dfamin_shortestMatchingInput"] = shortestPath.Item1.Length;
+
+                    autMeasures["dfamin_timeout"] = 0;
+                }
+                catch (TimeoutException e)
+                {
+                    autMeasures["dfamin_timeout"] = 1;
+                }
 
                 // It worked!
                 autMeasures["valid"] = 1;
