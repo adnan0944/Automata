@@ -2217,13 +2217,17 @@ namespace Microsoft.Automata
         /// <summary>
         /// The sink state will be the state with the largest id.
         /// </summary>
-        public Automaton<T> MakeTotal()
+        public Automaton<T> MakeTotal(int timeout=0)
         {
             IBooleanAlgebra<T> solver = algebra;
             var aut = this;
             if (!this.isEpsilonFree)
+            {
+                Console.Error.WriteLine("MT: Removing epsilons");
                 aut = this.RemoveEpsilons();
+            }
 
+            Console.Error.WriteLine("MT: State by state");
             int deadState = aut.maxState + 1;
             var newMoves = new List<Move<T>>();
             foreach (int state in aut.States)
@@ -2238,6 +2242,7 @@ namespace Microsoft.Automata
             if (newMoves.Count == 0)
                 return this;
 
+            Console.Error.WriteLine("MT: Creating automaton");
             newMoves.Add(Move<T>.Create(deadState, deadState, solver.True));
             newMoves.AddRange(GetMoves());
             var tot = Automaton<T>.Create(aut.Algebra, aut.initialState, aut.finalStateSet, newMoves, false, false, aut.isDeterministic);
@@ -2697,7 +2702,10 @@ namespace Microsoft.Automata
             IBooleanAlgebra<T> solver = algebra;
             //return MinimizeClassical(solver, 0, false);
             if (IsEmpty)
+            {
+                Console.Error.WriteLine("MM: Empty");
                 return Minimize();
+            }
 
             if (this.IsEpsilon)
                 return this;
@@ -2711,14 +2719,17 @@ namespace Microsoft.Automata
             //if (fa.IsDeterministic != true)
             //    throw new AutomataException(AutomataExceptionKind.AutomatonIsNotDeterministic);
 
-            fa = fa.MakeTotal();
+            Console.Error.WriteLine("MM: fa.MakeTotal()");
+            fa = fa.MakeTotal(timeout);
 
             Func<int, int, Tuple<int, int>> MkPair = (x, y) => (x < y ? new Tuple<int, int>(x, y) : new Tuple<int, int>(y, x));
 
             var distinguishable = new HashSet<Tuple<int, int>>();
             var stack = new Stack<Tuple<int, int>>();
 
+            Console.Error.WriteLine("MM: building distinguishable");
             foreach (var p in fa.GetStates())
+            {
                 if (!fa.IsFinalState(p))
                     foreach (var q in fa.GetFinalStates())
                     {
@@ -2726,9 +2737,13 @@ namespace Microsoft.Automata
                         distinguishable.Add(pair);
                         stack.Push(pair);
                     }
+                CheckTimeout(sw, timeout);
+            }
 
             while (stack.Count > 0)
             {
+                Console.Error.WriteLine("MM: stack.Count {0}", stack.Count);
+
                 var pair = stack.Pop();
                 foreach (var m1 in fa.GetMovesTo(pair.Item1))
                     foreach (var m2 in fa.GetMovesTo(pair.Item2))
@@ -2747,6 +2762,7 @@ namespace Microsoft.Automata
 
             var repr = new Dictionary<int, int>();
 
+            Console.Error.WriteLine("MM: distinguishable check");
             for (int i = 0; i < states.Length; i++)
             {
                 var p = states[i];
@@ -2762,6 +2778,7 @@ namespace Microsoft.Automata
                 }
             }
 
+            Console.Error.WriteLine("MM: guards");
             var guards = new Dictionary<Tuple<int, int>, T>();
 
             foreach (var move in fa.GetMoves())
