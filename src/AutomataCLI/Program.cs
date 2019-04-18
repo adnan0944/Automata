@@ -13,6 +13,7 @@ namespace AutomataCLI
 {
     class Program
     {
+        public static int timeout_ms = 5 * 1000;
         static void Main(string[] args)
         {
             String pattern = @"^abc(e*|f)+$";
@@ -171,19 +172,21 @@ namespace AutomataCLI
         public Dictionary<string, int> MeasureAutomaton(string pattern)
         {
             Dictionary<string, int> autMeasures = new Dictionary<string, int>();
-            autMeasures["valid"] = 0;
-
-            int timeout_ms = 5 * 1000; // 5 seconds in ms
 
             try
             {
                 Console.Error.WriteLine("Automaton measurements");
+                // We know nothing. Could time out at several points.
+                autMeasures["nfa_orig_completeInfo"] = 0;
+                autMeasures["nfa_efree_completeInfo"] = 0;
+                autMeasures["dfa_completeInfo"] = 0;
 
                 CharSetSolver solver = new CharSetSolver();
                 RegexToAutomatonConverter<BDD> conv = new RegexToAutomatonConverter<BDD>(solver);
 
-                // NFA measurements
+                #region NFA measurements
                 Console.Error.WriteLine("NFA");
+
                 bool hasLoops = false;
                 Automaton<BDD> aut = conv.Convert(pattern, RegexOptions.None, false, false, out hasLoops);
                 Console.Error.WriteLine("  nfa has {0} states, {1} edges", Automaton_nStates(aut), Automaton_nEdges(aut));
@@ -191,24 +194,39 @@ namespace AutomataCLI
                 autMeasures["nfa_orig_nEdges"] = Automaton_nEdges(aut);
                 autMeasures["nfa_orig_nEdgePairs"] = Automaton_nEdgePairs(aut);
                 //autMeasures["nfa_orig_isLoopFree"] = Automaton_isLoopFree(aut);
-                autMeasures["finiteLanguage"] = hasLoops ? 0 : 1;
+                autMeasures["nfa_orig_finiteLanguage"] = hasLoops ? 0 : 1;
                 //aut.ShowGraph("nfa_orig_pattern-" + pattern.GetHashCode());
 
-                // e-free NFA measurements
+                autMeasures["nfa_orig_completeInfo"] = 1;
+                #endregion
+
+                #region e-free NFA measurements
                 Console.Error.WriteLine("e-free NFA");
-                Automaton<BDD> efree = aut.RemoveEpsilons();
-                Console.Error.WriteLine("  efree has {0} states, {1} edges", Automaton_nStates(efree), Automaton_nEdges(efree));
-                autMeasures["nfa_efree_nStates"] = Automaton_nStates(efree);
-                autMeasures["nfa_efree_nEdges"] = Automaton_nEdges(efree);
-                autMeasures["nfa_efree_nEdgePairs"] = Automaton_nEdgePairs(efree);
-                //autMeasures["nfa_efree_isLoopFree"] = Automaton_isLoopFree(efree);
+                try
+                {
+                    Automaton<BDD> efree = aut.RemoveEpsilons(Program.timeout_ms);
+                    Console.Error.WriteLine("  efree has {0} states, {1} edges", Automaton_nStates(efree), Automaton_nEdges(efree));
+                    autMeasures["nfa_efree_nStates"] = Automaton_nStates(efree);
+                    autMeasures["nfa_efree_nEdges"] = Automaton_nEdges(efree);
+                    autMeasures["nfa_efree_nEdgePairs"] = Automaton_nEdgePairs(efree);
+                    //autMeasures["nfa_efree_isLoopFree"] = Automaton_isLoopFree(efree);
+
+                    autMeasures["nfa_efree_completeInfo"] = 1;
+                }
+                catch (TimeoutException e)
+                {
+                    autMeasures["nfa_efree_timeout"] = 1;
+                    Console.Error.WriteLine("Timeout generating e-free nfa from /{0}/", pattern);
+                }
+
+                #endregion
 
                 // Minimal NFA measurements
                 // These APIs seem untrustworthy. Odd behavior, require DFA, etc.
                 //Console.Error.WriteLine("Moore-minimized NFA");
                 //try
                 //{
-                //    Automaton<BDD> minaut = aut.MinimizeMoore(timeout_ms);
+                //    Automaton<BDD> minaut = aut.MinimizeMoore(Program.timeout_ms);
                 //    autMeasures["nfa_min_nStates"] = Automaton_nStates(minaut);
                 //    autMeasures["nfa_min_nEdges"] = Automaton_nEdges(minaut);
                 //    autMeasures["nfa_min_nEdgePairs"] = Automaton_nEdgePairs(minaut);
@@ -220,12 +238,12 @@ namespace AutomataCLI
                 //    autMeasures["nfa_min_timeout"] = 1;
                 //}
 
-                // DFA measurements
+                #region DFA measurements
                 Console.Error.WriteLine("DFA");
                 try
                 {
-                    Console.Error.WriteLine("  Determinizing (timeout {0} ms)", timeout_ms);
-                    Automaton<BDD> dfa = aut.Determinize(timeout_ms);
+                    Console.Error.WriteLine("  Determinizing (timeout {0} ms)", Program.timeout_ms);
+                    Automaton<BDD> dfa = aut.Determinize(Program.timeout_ms);
                     Console.Error.WriteLine("  dfa has {0} states, {1} edges", Automaton_nStates(dfa), Automaton_nEdges(dfa));
 
                     autMeasures["dfa_nStates"] = Automaton_nStates(dfa);
@@ -234,7 +252,9 @@ namespace AutomataCLI
 
                     Tuple<BDD[], int> dfaShortestPath = dfa.FindShortestFinalPath(dfa.InitialState);
                     autMeasures["dfa_shortestMatchingInput"] = dfaShortestPath.Item1.Length;
+
                     autMeasures["dfa_timeout"] = 0;
+                    autMeasures["dfa_completeInfo"] = 1;
 
                     if (false)
                     {
@@ -247,7 +267,7 @@ namespace AutomataCLI
                          * Seems like that would be an unusual regex engine optimization.
                          * Anyway, the upshot is, let's not measure this. */
                         Console.Error.WriteLine("  Minimizing");
-                        Automaton<BDD> dfamin = dfa.MinimizeMoore(timeout_ms);
+                        Automaton<BDD> dfamin = dfa.MinimizeMoore(Program.timeout_ms);
                         Console.Error.WriteLine("  dfamin has {0} states, {1} edges", Automaton_nStates(dfamin), Automaton_nEdges(dfamin));
 
                         autMeasures["dfamin_nStates"] = Automaton_nStates(dfamin);
@@ -259,15 +279,13 @@ namespace AutomataCLI
 
                         autMeasures["dfamin_timeout"] = 0;
                     }
+                    #endregion
                 }
                 catch (TimeoutException e)
                 {
                     autMeasures["dfa_timeout"] = 1;
-                    Console.Error.WriteLine("Error getting dfa information from /{0}/: {1}", pattern, e);
+                    Console.Error.WriteLine("Timeout getting dfa information from /{0}/", pattern);
                 }
-
-                // It worked!
-                autMeasures["valid"] = 1;
             }
             catch (System.OutOfMemoryException e)
             {
@@ -286,7 +304,7 @@ namespace AutomataCLI
          * Graph has no loops, facilitating the computation of the basis inputs.
          * Also reduces {x,y} to {1} to avoid combinatorial basis path explosion.
          */
-                    static string EFreeLooplessNFAGraph(string pattern)
+        static string EFreeLooplessNFAGraph(string pattern)
         {
             string graph = "";
             try
@@ -300,7 +318,7 @@ namespace AutomataCLI
                 bool removeLoops = true;
                 bool hasLoops = false;
                 Automaton<BDD> aut = conv.Convert(pattern, RegexOptions.None, false, removeLoops, out hasLoops)
-                    .RemoveEpsilons()
+                    .RemoveEpsilons(Program.timeout_ms)
                     //.Normalize() // Unnecessary
                     //.Minimize() // This has surprising effects, e.g. lopping off half of the graph if there is an OR. Not sure if this is an Automata bug.
                     ;
@@ -317,6 +335,7 @@ namespace AutomataCLI
             catch (Exception e)
             {
                 Console.Error.WriteLine("Error making automaton from /{0}/: {1}", pattern, e);
+                graph = "TIMEOUT";
             }
 
             return graph;
