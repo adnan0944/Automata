@@ -1341,23 +1341,31 @@ namespace Microsoft.Automata
         /// States unreachable from the initial state are eliminated.
         /// The reachable states remain the same.
         /// </summary>
-        public Automaton<T> RemoveEpsilons()
+        public Automaton<T> RemoveEpsilons(int timeout=0)
         {
-            return RemoveEpsilons(algebra.MkOr);
+            return RemoveEpsilons(algebra.MkOr, timeout);
         }
 
         /// <summary> 
         /// Used internally or when algebra=null
         /// </summary>
-        internal Automaton<T> RemoveEpsilons(Func<T, T, T> disj)
+        internal Automaton<T> RemoveEpsilons(Func<T, T, T> disj, int timeout=0)
         {
             var fa = this;
             if (fa.IsEpsilonFree)
                 return fa;
 
+            long timeout1 = Microsoft.Automata.Utilities.HighTimer.Frequency * ((long)timeout / (long)1000);
+            long timeoutLimit;
+            if (timeout > 0)
+                timeoutLimit = Utilities.HighTimer.Now + timeout1;
+            else
+                timeoutLimit = 0;
+
             #region collect all conditions on non-epsilon transitions
             Dictionary<Tuple<int, int>, T> conditions = new Dictionary<Tuple<int, int>, T>();
             foreach (Move<T> t in fa.GetMoves())
+            {
                 if (!t.IsEpsilon)
                 {
                     T cond;
@@ -1367,13 +1375,19 @@ namespace Microsoft.Automata
                     else
                         conditions[pair] = t.Label;
                 }
+                CheckTimeout(timeoutLimit);
+            }
             #endregion
 
             #region accumulate transition conditions via epsilon transitions
             foreach (int q in fa.States)
+            {
                 foreach (int p in fa.GetEpsilonClosure(q))
+                {
                     if (p != q)
+                    {
                         foreach (Move<T> t in fa.GetMovesFrom(p))
+                        {
                             if (!t.IsEpsilon)
                             {
                                 T cond;
@@ -1383,6 +1397,11 @@ namespace Microsoft.Automata
                                 else
                                     conditions[pair] = t.Label;
                             }
+                            CheckTimeout(timeoutLimit);
+                        }
+                    }
+                }
+            }
             #endregion
 
             #region map all states to their outgoing transitions
@@ -1400,12 +1419,17 @@ namespace Microsoft.Automata
             HashSet<int> reachableFromInitial = new HashSet<int>();
             reachableFromInitial.Add(fa.InitialState);
             while (frontier.Count > 0)
+            {
                 foreach (var t in outgoingTransitions[frontier.Pop()])
+                {
                     if (!reachableFromInitial.Contains(t.TargetState)) //otherwise already handled
                     {
                         frontier.Push(t.TargetState);
                         reachableFromInitial.Add(t.TargetState);
                     }
+                }
+                CheckTimeout(timeoutLimit);
+            }
             #endregion
 
             #region eliminate unreachable states
@@ -1431,6 +1455,7 @@ namespace Microsoft.Automata
                         break;
                     }
                 }
+                CheckTimeout(timeoutLimit);
             }
 
             Automaton<T> nfa = Automaton<T>.Create(this.algebra, fa.InitialState, finalStates, EnumerateMoves(outgoingTransitions));
@@ -2224,7 +2249,7 @@ namespace Microsoft.Automata
             if (!this.isEpsilonFree)
             {
                 Console.Error.WriteLine("MT: Removing epsilons");
-                aut = this.RemoveEpsilons();
+                aut = this.RemoveEpsilons(timeout);
             }
 
             Console.Error.WriteLine("MT: State by state");
@@ -2564,7 +2589,7 @@ namespace Microsoft.Automata
             else
                 timeoutLimit = 0;
 
-            var A = this.RemoveEpsilons();
+            var A = this.RemoveEpsilons(timeout);
 
             //the sink state is represented implicitly, there is no need to make B total
             List<int> states = new List<int>(A.States);
