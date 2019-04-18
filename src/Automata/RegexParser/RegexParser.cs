@@ -496,39 +496,41 @@ namespace System.Text.RegularExpressions {
                                         MoveRight();
                                         if (CharsRight() == 0 || RightChar() == '}')
                                         {
-                                            // {5,}
+                                            // {0,} or {5,}
                                             _featureVec["LWB"]++;
                                             hasLoops = true;
-                                            if (reduceForBasisPaths)
-                                            {
-                                                min = 1;
-                                                max = 1;
-                                            }
-                                            else
-                                                max = Int32.MaxValue;
+                                            max = Int32.MaxValue;
                                         }
                                         else
                                         {
-                                            // {5,6}
+                                            // {0,5} or {5,6}
                                             _featureVec["DBB"]++;
                                             max = ScanDecimal();
-
-                                            if (reduceForBasisPaths)
-                                            {
-                                                min = 1;
-                                                max = 1;
-                                            }
                                         }
                                     }
                                     else
                                     {
-                                        // {5}
+                                        // {0} or {5}
                                         _featureVec["SNG"]++;
-                                        if (reduceForBasisPaths)
+                                    }
+                                }
+
+                                // Reduce the bounds to {0,1} or {1,1} if we want an easy way to obtain basis paths.
+                                if (reduceForBasisPaths)
+                                {
+                                    if (min == 0)
+                                    {
+                                        // {0,m} --> {0,1}
+                                        if (max > 0)
                                         {
-                                            min = 1;
                                             max = 1;
                                         }
+                                    }
+                                    else
+                                    {
+                                        // {a,b} --> {1,1}
+                                        min = 1;
+                                        max = 1;
                                     }
                                 }
 
