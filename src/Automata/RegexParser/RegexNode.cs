@@ -49,7 +49,7 @@ namespace System.Text.RegularExpressions {
     using System.Diagnostics;
     using System.Globalization;
 
-    internal sealed class RegexNode {
+    public sealed class RegexNode {
         /*
          * RegexNode types
          */
@@ -60,31 +60,31 @@ namespace System.Text.RegularExpressions {
         //    static final int Notonerep  = RegexCode.Notonerep;  // c,n      .{n}
         //    static final int Setrep     = RegexCode.Setrep;     // set,n    \d {n}
 
-        internal const int Oneloop    = RegexCode.Oneloop;    // c,n      a*
-        internal const int Notoneloop = RegexCode.Notoneloop; // c,n      .*
-        internal const int Setloop    = RegexCode.Setloop;    // set,n    \d*
+        public const int Oneloop    = RegexCode.Oneloop;    // c,n      a*
+        public const int Notoneloop = RegexCode.Notoneloop; // c,n      .*
+        public const int Setloop    = RegexCode.Setloop;    // set,n    \d*
 
-        internal const int Onelazy    = RegexCode.Onelazy;    // c,n      a*?
-        internal const int Notonelazy = RegexCode.Notonelazy; // c,n      .*?
-        internal const int Setlazy    = RegexCode.Setlazy;    // set,n    \d*?
+        public const int Onelazy    = RegexCode.Onelazy;    // c,n      a*?
+        public const int Notonelazy = RegexCode.Notonelazy; // c,n      .*?
+        public const int Setlazy    = RegexCode.Setlazy;    // set,n    \d*?
 
-        internal const int One        = RegexCode.One;        // char     a
-        internal const int Notone     = RegexCode.Notone;     // char     . [^a]
-        internal const int Set        = RegexCode.Set;        // set      [a-z] \w \s \d
+        public const int One        = RegexCode.One;        // char     a
+        public const int Notone     = RegexCode.Notone;     // char     . [^a]
+        public const int Set        = RegexCode.Set;        // set      [a-z] \w \s \d
 
-        internal const int Multi      = RegexCode.Multi;      // string   abcdef
-        internal const int Ref        = RegexCode.Ref;        // index    \1
+        public const int Multi      = RegexCode.Multi;      // string   abcdef
+        public const int Ref        = RegexCode.Ref;        // index    \1
 
-        internal const int Bol        = RegexCode.Bol;        //          ^
-        internal const int Eol        = RegexCode.Eol;        //          $
-        internal const int Boundary   = RegexCode.Boundary;   //          \b
-        internal const int Nonboundary= RegexCode.Nonboundary;//          \B
-        internal const int ECMABoundary   = RegexCode.ECMABoundary;    // \b
-        internal const int NonECMABoundary= RegexCode.NonECMABoundary; // \B
-        internal const int Beginning  = RegexCode.Beginning;  //          \A
-        internal const int Start      = RegexCode.Start;      //          \G
-        internal const int EndZ       = RegexCode.EndZ;       //          \Z
-        internal const int End        = RegexCode.End;        //          \z
+        public const int Bol        = RegexCode.Bol;        //          ^
+        public const int Eol        = RegexCode.Eol;        //          $
+        public const int Boundary   = RegexCode.Boundary;   //          \b
+        public const int Nonboundary= RegexCode.Nonboundary;//          \B
+        public const int ECMABoundary   = RegexCode.ECMABoundary;    // \b
+        public const int NonECMABoundary= RegexCode.NonECMABoundary; // \B
+        public const int Beginning  = RegexCode.Beginning;  //          \A
+        public const int Start      = RegexCode.Start;      //          \G
+        public const int EndZ       = RegexCode.EndZ;       //          \Z
+        public const int End        = RegexCode.End;        //          \z
 
         // (note: End               = 21;)
 
@@ -561,15 +561,27 @@ namespace System.Text.RegularExpressions {
             _children.Add(reducedChild);
             reducedChild._next = this;
         }
-        internal RegexNode Child(int i) {
+        public RegexNode Child(int i) {
             return _children[i];
         }
 
-        internal int ChildCount() {
+        public int ChildCount() {
             return _children == null ? 0 : _children.Count;
         }
+        public RegexNode Next()
+        {
+            return _next;
+        }
+        public string Str()
+        {
+            return _str;
+        }
+        public char Ch()
+        {
+            return _ch;
+        }
 
-        internal int Type() {
+        public int Type() {
             return _type;
         }
 

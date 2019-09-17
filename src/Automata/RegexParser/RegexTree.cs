@@ -31,6 +31,11 @@ namespace System.Text.RegularExpressions {
             _options = opts;
         }
 
+        public RegexNode GetRoot()
+        {
+            return _root;
+        }
+
         internal RegexNode _root;
 #if SILVERLIGHT
         internal Dictionary<Int32, Int32> _caps;
