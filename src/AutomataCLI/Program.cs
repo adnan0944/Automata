@@ -48,6 +48,12 @@ namespace AutomataCLI
             //new RegexMetrics(@"^abc$");
             //new RegexMetrics(@"^abc$|def");
 
+            //Console.WriteLine("Here");
+            //pattern = @"(?<name>abc)(?:b)(c)(d(e))"; // PNG BKR
+            //pattern = @"a(?i-x:(\w))b"; // OPT CG
+            pattern = @"(c[1234567890])\(d(e)\)\1\2\1\1\1\1"; // CG BKR
+            new RegexMetrics(pattern);
+            Console.ReadKey();
             // Check args
             if (args.Length != 1)
             {
@@ -109,6 +115,7 @@ namespace AutomataCLI
         public bool validCSharpRegex { get; set; }
         public int regexLen { get; set; }
         public Dictionary<string, int> featureVector { get; set; }
+        public Dictionary<int, Dictionary<string, string>> groupVector { get; set; }
         public Dictionary<string, int> automataMeasures { get; set; }
         public string efreeNFAGraph { get; set; }
 
@@ -121,6 +128,7 @@ namespace AutomataCLI
 
             regexLen = pattern.Length;
             featureVector = MeasureFeatureVector(pattern);
+            groupVector = MeasureGroups(pattern);
             automataMeasures = MeasureAutomaton(pattern);
             efreeNFAGraph = EFreeLooplessNFAGraph(pattern);
 
@@ -145,6 +153,27 @@ namespace AutomataCLI
             return validCSharpRegex;
         }
 
+        public Dictionary<int, Dictionary<string, string>> MeasureGroups(string pattern)
+        {
+            Dictionary<int, Dictionary<string, string>> cg = new Dictionary<int, Dictionary<string, string>>();
+
+            try
+            {
+                Console.Error.WriteLine("Capture group extraction");
+
+                CharSetSolver solver = new CharSetSolver();
+                RegexToAutomatonConverter<BDD> conv = new RegexToAutomatonConverter<BDD>(solver);
+
+                cg = conv.GroupVector(pattern);
+                DumpGroupVector(cg);
+            }
+            catch (Exception e)
+            {
+                Console.Error.WriteLine("Error getting feature vector from /{0}/: {1}", pattern, e);
+            }
+
+            return cg;
+        }
         public Dictionary<string, int> MeasureFeatureVector(string pattern)
         {
             Dictionary<string, int> fv = new Dictionary<string, int>();
@@ -407,6 +436,13 @@ namespace AutomataCLI
             return graph;
         }
 
+        static void DumpGroupVector(Dictionary<int, Dictionary<string, string>> cg)
+        {
+            foreach (int feature in cg.Keys)
+            {
+                Console.Error.WriteLine("{0} : {{'subexpression' : {1}, 'type' : {2}, 'pattern' : {3}, 'nBackreferenced' : {4}}}", feature, cg[feature]["Subexpression"], cg[feature]["type"], cg[feature]["pattern"], cg[feature]["nBackreferenced"]);
+            }
+        }
 
         static void DumpFeatureVector(Dictionary<string, int> fv)
         {

@@ -142,6 +142,22 @@ namespace Microsoft.Automata
             return p.FeatureVec();
         }
 
+        public Dictionary<int, Dictionary<string, string>> GroupVector(string regex)
+        {
+            // Scan the regex
+            RegexParser p;
+
+            // Cribbed from RegexParser.Parse()
+            p = new RegexParser(CultureInfo.CurrentCulture);
+            p.SetPattern(regex);
+            p.CountCaptures();
+            p.Reset(RegexOptions.None);
+            p.ScanRegex();
+
+            // Return the capnames list created during the scan
+            return p.GroupVec();
+        }
+
         internal Tuple<string,Automaton<S>>[] ConvertCaptures(string regex, out bool isLoop)
         {
             //automBuilder.Reset();

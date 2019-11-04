@@ -18,11 +18,18 @@ namespace System.Text.RegularExpressions {
     using System.Collections;
     using System.Collections.Generic;
     using System.Globalization;
-        
+    using System.Linq;
+      
+    
     internal sealed class RegexParser {
         // This gets populated during a call to Parse().
         // Retrieve afterward.
         internal Dictionary<string, int> _featureVec;
+        internal Dictionary<int, Dictionary<string, string>> _groupVecList = new Dictionary<int, Dictionary<string, string>>();
+
+        internal Stack<int> groupConstructStack = new Stack<int>();
+        internal Stack<string> groupConstructStackDescription = new Stack<string>();
+        internal Stack<int> patternStack = new Stack<int>();
 
         internal RegexNode _stack;
         internal RegexNode _group;
@@ -44,6 +51,7 @@ namespace System.Text.RegularExpressions {
 #else
         internal Hashtable _caps;
         internal Hashtable _capnames;
+        //internal Hashtable _backreferenceTrack;
 #endif
         internal Int32[] _capnumlist;
         internal List<String> _capnamelist;
@@ -211,6 +219,7 @@ namespace System.Text.RegularExpressions {
             return input;
         }
 
+
         internal Dictionary<string, int> EmptyFeatureVec()
         {
             return new Dictionary<string, int>
@@ -261,7 +270,8 @@ namespace System.Text.RegularExpressions {
          * Private constructor.
          */
         public RegexParser(CultureInfo culture) {
-            _featureVec = EmptyFeatureVec(); 
+            _featureVec = EmptyFeatureVec();
+            _groupVecList = new Dictionary<int, Dictionary<string, string>>();
             _culture = culture;
             _optionsStack = new List<RegexOptions>();
 #if SILVERLIGHT
@@ -1270,6 +1280,25 @@ namespace System.Text.RegularExpressions {
                 if (CharsRight() > 0 && MoveRightGetChar() == close) {
                     if (IsCaptureSlot(capnum))
                     {
+                        SortedDictionary<int, Dictionary<string, string>> sortedGroupVectors = new SortedDictionary<int, Dictionary<string, string>>(_groupVecList);
+                        int loopVar = 0;
+                        int posKey = -1;
+                        foreach (int startPos in sortedGroupVectors.Keys)
+                        {
+                            if (sortedGroupVectors[startPos]["type"] == "CG")
+                            {
+                                loopVar++;
+                            }
+                            if (loopVar == capnum)
+                            {
+                                posKey = startPos;
+                                break;
+                            }
+                        }
+                        //posKey = (int)_caps[capnum];
+                        int currentBackreferenceCount = Int32.Parse(_groupVecList[posKey]["nBackreferenced"]);
+                        currentBackreferenceCount++;
+                        _groupVecList[posKey]["nBackreferenced"] = currentBackreferenceCount.ToString();
                         _featureVec["BKR"]++;
                         return new RegexNode(RegexNode.Ref, _options, capnum);
                     }
@@ -1295,6 +1324,25 @@ namespace System.Text.RegularExpressions {
                     }
                     if (capnum >= 0)
                     {
+                        SortedDictionary<int, Dictionary<string, string>> sortedGroupVectors = new SortedDictionary<int, Dictionary<string, string>>(_groupVecList);
+                        int loopVar = 0;
+                        int posKey = -1;
+                        foreach(int startPos in sortedGroupVectors.Keys)
+                        {
+                            if(sortedGroupVectors[startPos]["type"] == "CG")
+                            {
+                                loopVar++;
+                            }
+                            if (loopVar == capnum)
+                            {
+                                posKey = startPos;
+                                break;
+                            }
+                        }
+                        //posKey = (int)_caps[capnum];
+                        int currentBackreferenceCount = Int32.Parse(_groupVecList[posKey]["nBackreferenced"]);
+                        currentBackreferenceCount++;
+                        _groupVecList[posKey]["nBackreferenced"] = currentBackreferenceCount.ToString();
                         _featureVec["BKR"]++;
                         return new RegexNode(RegexNode.Ref, _options, capnum);
                     }
@@ -1304,6 +1352,25 @@ namespace System.Text.RegularExpressions {
                   int capnum = ScanDecimal();
                   if (IsCaptureSlot(capnum))
                   {
+                        SortedDictionary<int, Dictionary<string, string>> sortedGroupVectors = new SortedDictionary<int, Dictionary<string, string>>(_groupVecList);
+                        int loopVar = 0;
+                        int posKey = -1;
+                        foreach (int startPos in sortedGroupVectors.Keys)
+                        {
+                            if (sortedGroupVectors[startPos]["type"] == "CG")
+                            {
+                                loopVar++;
+                            }
+                            if (loopVar == capnum)
+                            {
+                                posKey = startPos;
+                                break;
+                            }
+                        }
+                        //posKey = (int)_caps[capnum];
+                        int currentBackreferenceCount = Int32.Parse(_groupVecList[posKey]["nBackreferenced"]);
+                      currentBackreferenceCount++;
+                      _groupVecList[posKey]["nBackreferenced"] = currentBackreferenceCount.ToString();
                       _featureVec["BKR"]++;
                       return new RegexNode(RegexNode.Ref, _options, capnum);
                   }
@@ -1318,6 +1385,11 @@ namespace System.Text.RegularExpressions {
                 if (CharsRight() > 0 && MoveRightGetChar() == close) {
                     if (IsCaptureName(capname))
                     {
+                        int dummycapnum = (int)_capnames[capname];
+                        int posKey = (int)_caps[dummycapnum];
+                        int currentBackreferenceCount = Int32.Parse(_groupVecList[posKey]["nBackreferenced"]);
+                        currentBackreferenceCount++;
+                        _groupVecList[posKey]["nBackreferenced"] = currentBackreferenceCount.ToString();
                         _featureVec["BKRN"]++;
                         return new RegexNode(RegexNode.Ref, _options, CaptureSlotFromName(capname));
                     }
@@ -1785,13 +1857,39 @@ namespace System.Text.RegularExpressions {
 
                     case ')':
                         if (!EmptyOptionsStack())
+                        {
+                            //Console.WriteLine("a closing parenthesis found at: {0} {1}", _currentPos,pos);
+                            if (groupConstructStack.Count() > 0)
+                            {
+                                
+                                Dictionary<string, string> _group_Vec = new Dictionary<string, string>();
+                                int parenStartPos = groupConstructStack.Pop();
+                                var groupDescription = groupConstructStackDescription.Pop();
+                                int patternStart = patternStack.Pop();
+                                _group_Vec["Subexpression"] = _pattern.Substring(parenStartPos, pos - parenStartPos + 1);
+                                _group_Vec["type"] = groupDescription;
+                                _group_Vec["pattern"] = _pattern.Substring(patternStart, pos - patternStart);
+                                _group_Vec["nBackreferenced"] = "0";
+                                //_group_Vec["startPos"] = parenStartPos.ToString();
+                                //Console.WriteLine("Group Vector items: {0} {1} {2}", _group_Vec["Subexpression"], _group_Vec["type"], _group_Vec["pattern"]);
+                                _groupVecList.Add(parenStartPos, _group_Vec);
+                                //Console.WriteLine("Pop stacks: {0} {1} {2}", parenStartPos, groupDescription, patternStart);
+                                //Console.WriteLine("group: {0}", _pattern.Substring(parenStartPos, pos - parenStartPos + 1));
+                                //Console.WriteLine("Subpattern: {0}", _pattern.Substring(patternStart, pos - patternStart));
+
+                            }
+                      
                             PopOptions();
+                        }
                         break;
 
                     case '(':
                         if (CharsRight() >= 2 && RightChar(1) == '#' && RightChar() == '?') {
                             MoveLeft();
-                            ScanBlank();
+                            ScanBlank(); //avoid inline comment
+                            groupConstructStack.Push(pos);
+                            groupConstructStackDescription.Push("avoid");
+                            patternStack.Push(pos+3);
                         } 
                         else {
                             
@@ -1813,17 +1911,22 @@ namespace System.Text.RegularExpressions {
                                             NoteCaptureSlot(ScanDecimal(), pos);
                                         else 
                                             NoteCaptureName(ScanCapname(), pos);
+                                        groupConstructStack.Push(pos);
+                                        groupConstructStackDescription.Push("CG");
+                                        patternStack.Push(_currentPos+1);
                                     }
+                                    // at subpattern
                                 }
                                 else {
                                     // (?...
 
                                     // get the options if it's an option construct (?cimsx-cimsx...)
                                     ScanOptions();
+                                    // could be non-capturing group or lookX or...
 
                                     if (CharsRight() > 0) {
                                         if (RightChar() == ')') {
-                                            // (?cimsx-cimsx)
+                                            // (?cimsx-cimsx) avoid this
                                             MoveRight();
                                             PopKeepOptions();
                                         }
@@ -1832,15 +1935,43 @@ namespace System.Text.RegularExpressions {
                                             // ignore the next paren so we don't capture the condition
                                             _ignoreNextParen = true;
 
+                                            groupConstructStack.Push(pos);
+                                            groupConstructStackDescription.Push("avoid");
+                                            patternStack.Push(pos + 1);
                                             // break from here so we don't reset _ignoreNextParen
                                             break;
                                         }
+                                        else if(RightChar() == ':')
+                                        {
+                                            groupConstructStack.Push(pos);
+                                            groupConstructStackDescription.Push("NCG");
+                                            patternStack.Push(_currentPos + 1);
+                                        }
+                                        else
+                                        {
+                                            groupConstructStack.Push(pos);
+                                            groupConstructStackDescription.Push("LookAround");
+                                            patternStack.Push(_currentPos+1);
+                                        }
                                     }
+                                   
                                 }
                             }
                             else {
+                                // capture group sbP
                                 if (!UseOptionN() && !_ignoreNextParen)
+                                {
                                     NoteCaptureSlot(_autocap++, pos);
+                                    groupConstructStack.Push(pos);
+                                    groupConstructStackDescription.Push("CG");
+                                    patternStack.Push(pos+1);
+                                }
+                                else
+                                {
+                                    groupConstructStack.Push(pos);
+                                    groupConstructStackDescription.Push("avoid");
+                                    patternStack.Push(pos+1);
+                                }
                             }
                         }
 
@@ -2405,6 +2536,24 @@ namespace System.Text.RegularExpressions {
         public Dictionary<string, int> FeatureVec()
         {
             return _featureVec;
+        }
+
+        public Dictionary<int, Dictionary<string, string>> GroupVec()
+        {
+            return _groupVecList;
+        }
+
+        public Dictionary<String, Int32> HashtableToDictionary()
+        {
+            //Console.WriteLine(String.Join(" ", _capnamelist));
+            foreach (int key in _caps.Keys)
+            {
+                Console.WriteLine(String.Format("{0}: {1}", key, _caps[key]));
+            }
+            Console.WriteLine("Usage of capture groups:");
+           
+            Console.WriteLine("Finished writing");
+            return _capnames.Cast<DictionaryEntry>().ToDictionary(kvp => (String)kvp.Key, kvp => (Int32)kvp.Value);
         }
     }
 }
